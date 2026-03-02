@@ -1,0 +1,10 @@
+{
+  "name": "com.inonego.dosession",
+  "version": "1.0.0",
+  "displayName": "DoSession",
+  "description": "범용 Undo/Redo 시스템. Command 패턴 기반.",
+  "author": {
+    "name": "inonego",
+    "email": "hmud0721@naver.com"
+  }
+}
