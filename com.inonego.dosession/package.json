@@ -1,8 +1,8 @@
 {
   "name": "com.inonego.dosession",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "displayName": "DoSession",
-  "description": "범용 Undo/Redo 시스템. Command 패턴 기반.",
+  "description": "Generic Undo/Redo system based on the Command pattern for Unity.",
   "author": {
     "name": "inonego",
     "email": "hmud0721@naver.com"

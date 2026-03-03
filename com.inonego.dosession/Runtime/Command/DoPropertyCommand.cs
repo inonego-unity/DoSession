@@ -3,48 +3,48 @@ using System;
 namespace inonego.DoSession
 {
 
-   // ============================================================
+   // ===============================================================================
    /// <summary>
-   /// <br/> 프로퍼티 변경 전용 Command.
-   /// <br/> getter/setter 람다로 이전 값을 자동 캡처한다.
+   /// <br/> Command for property changes.
+   /// <br/> Automatically captures the previous value via getter/setter lambdas.
    /// </summary>
-   // ============================================================
-   [Serializable]
+   // ===============================================================================
    public class DoPropertyCommand<TTarget, TValue> : IDoCommand
    {
 
-   #region 필드
+   #region Fields
 
-      private readonly TTarget target;
-      private readonly Func<TTarget, TValue> getter;
-      private readonly Action<TTarget, TValue> setter;
-      private readonly TValue oldValue;
-      private readonly TValue newValue;
+      private TTarget target;
+      private Func<TTarget, TValue> getter;
+      private Action<TTarget, TValue> setter;
+      private TValue oldValue;
+      private TValue newValue;
+      private string desc;
 
       // ------------------------------------------------------------
       /// <summary>
-      /// 되돌리기 가능 여부. 타겟이 null이면 불가.
+      /// Whether undo is possible. False if target is null.
       /// </summary>
       // ------------------------------------------------------------
       public bool CanUndo => target != null;
 
       // ------------------------------------------------------------
       /// <summary>
-      /// 작업 설명.
+      /// Operation description.
       /// </summary>
       // ------------------------------------------------------------
-      public string Desc { get; }
+      public string Desc => desc;
 
    #endregion
 
-   #region 생성자
+   #region Constructor
 
-      // ------------------------------------------------------------
+      // ----------------------------------------------------------------------
       /// <summary>
-      /// <br/> 프로퍼티 변경 Command를 생성한다.
-      /// <br/> 생성 시점의 현재 값을 oldValue로 캡처한다.
+      /// <br/> Creates a property change command.
+      /// <br/> Captures the current value as oldValue at construction time.
       /// </summary>
-      // ------------------------------------------------------------
+      // ----------------------------------------------------------------------
       public DoPropertyCommand(TTarget target, Func<TTarget, TValue> getter, Action<TTarget, TValue> setter, TValue newValue, string desc)
       {
          this.target = target;
@@ -52,13 +52,12 @@ namespace inonego.DoSession
          this.setter = setter;
          this.oldValue = getter(target);
          this.newValue = newValue;
-
-         Desc = desc;
+         this.desc = desc;
       }
 
    #endregion
 
-   #region 메서드
+   #region Methods
 
       public void Do() => setter(target, newValue);
       public void Undo() => setter(target, oldValue);

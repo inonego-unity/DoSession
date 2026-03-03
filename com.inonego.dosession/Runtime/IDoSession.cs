@@ -5,8 +5,8 @@ namespace inonego.DoSession
 
    // ============================================================
    /// <summary>
-   /// <br/> DoSession의 핵심 API만 노출하는 인터페이스.
-   /// <br/> DI, 테스트, 모킹 용도.
+   /// <br/> Interface exposing only the core API of DoSession.
+   /// <br/> Intended for DI, testing, and mocking.
    /// </summary>
    // ============================================================
    public interface IDoSession
@@ -14,42 +14,42 @@ namespace inonego.DoSession
 
       // ------------------------------------------------------------
       /// <summary>
-      /// Command를 실행하고 Undo 스택에 추가한다.
+      /// Executes the command and pushes it onto the undo stack.
       /// </summary>
       // ------------------------------------------------------------
       void Do(IDoCommand command);
 
       // ------------------------------------------------------------
       /// <summary>
-      /// 마지막 작업을 되돌린다. 성공 시 true.
+      /// Undoes the last operation. Returns true on success.
       /// </summary>
       // ------------------------------------------------------------
       bool Undo();
 
       // ------------------------------------------------------------
       /// <summary>
-      /// 마지막으로 되돌린 작업을 다시 실행한다. 성공 시 true.
+      /// Redoes the last undone operation. Returns true on success.
       /// </summary>
       // ------------------------------------------------------------
       bool Redo();
 
       // ------------------------------------------------------------
       /// <summary>
-      /// Undo 가능 여부.
+      /// Whether undo is possible.
       /// </summary>
       // ------------------------------------------------------------
       bool CanUndo { get; }
 
       // ------------------------------------------------------------
       /// <summary>
-      /// Redo 가능 여부.
+      /// Whether redo is possible.
       /// </summary>
       // ------------------------------------------------------------
       bool CanRedo { get; }
 
       // ------------------------------------------------------------
       /// <summary>
-      /// 히스토리 변경 시 발생하는 이벤트.
+      /// Raised when the history changes.
       /// </summary>
       // ------------------------------------------------------------
       event Action OnChange;

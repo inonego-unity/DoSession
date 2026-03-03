@@ -2,56 +2,63 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 
+using UnityEngine;
+
 namespace inonego.DoSession
 {
 
-   // ============================================================
+   // ===============================================================================
    /// <summary>
-   /// <br/> 복합 명령. 여러 Command를 하나의 Undo 단위로 묶는다.
-   /// <br/> DoSession.BeginGroup/EndGroup에서 내부적으로 생성.
+   /// <br/> Composite command. Bundles multiple commands into a single undo unit.
+   /// <br/> Created internally by DoSession.BeginGroup/EndGroup.
    /// </summary>
-   // ============================================================
+   // ===============================================================================
+   [Serializable]
    internal class DoGroupCommand : IDoCommand
    {
 
-   #region 필드
+   #region Fields
 
-      private readonly List<IDoCommand> commands = null;
+      [SerializeReference]
+      private List<IDoCommand> commands = null;
+      public IReadOnlyList<IDoCommand> Commands => commands;
+
+      [SerializeField]
+      private string desc = null;
 
       // ------------------------------------------------------------
       /// <summary>
-      /// 모든 자식 Command가 되돌리기 가능해야 true.
+      /// True only if all child commands can be undone.
       /// </summary>
       // ------------------------------------------------------------
       public bool CanUndo => commands.TrueForAll(cmd => cmd.CanUndo);
 
       // ------------------------------------------------------------
       /// <summary>
-      /// 그룹 설명.
+      /// Group description.
       /// </summary>
       // ------------------------------------------------------------
-      public string Desc { get; }
+      public string Desc => desc;
 
    #endregion
 
-   #region 생성자
+   #region Constructor
 
       public DoGroupCommand(List<IDoCommand> commands, string desc)
       {
          this.commands = commands;
-
-         Desc = desc;
+         this.desc = desc;
       }
 
    #endregion
 
-   #region 메서드
+   #region Methods
 
-      // ------------------------------------------------------------
+      // --------------------------------------------------------------------------
       /// <summary>
-      /// 순방향 실행. Redo 시에만 호출된다.
+      /// Executes all commands in forward order. Only called during redo.
       /// </summary>
-      // ------------------------------------------------------------
+      // --------------------------------------------------------------------------
       public void Do()
       {
          foreach (var cmd in commands)
@@ -62,7 +69,7 @@ namespace inonego.DoSession
 
       // ------------------------------------------------------------
       /// <summary>
-      /// 역순으로 되돌리기.
+      /// Undoes all commands in reverse order.
       /// </summary>
       // ------------------------------------------------------------
       public void Undo()
