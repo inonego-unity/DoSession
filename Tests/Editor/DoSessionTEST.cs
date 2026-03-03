@@ -8,24 +8,25 @@ using inonego.DoSession;
 
 // ============================================================
 /// <summary>
-/// DoSession 시스템 전체 테스트.
+/// DoSession full system tests.
 /// </summary>
 // ============================================================
 public class DoSessionTEST
 {
 
-#region 헬퍼
+#region Helpers
 
    // ============================================================
    /// <summary>
-   /// 테스트용 간단한 Command. 값을 증감시킨다.
+   /// Serializable test command. Increments/decrements a value.
    /// </summary>
    // ============================================================
+   [Serializable]
    private class TestCommand : IDoCommand
    {
       public int Value = 0;
       public bool CanUndo { get; set; } = true;
-      public string Desc => "테스트";
+      public string Desc => "Test";
 
       public void Do() => Value++;
       public void Undo() => Value--;
@@ -38,15 +39,15 @@ public class DoSessionTEST
 
 #endregion
 
-#region Do / Undo / Redo 기본
+#region Do / Undo / Redo
 
    // ------------------------------------------------------------
    /// <summary>
-   /// Do 실행 후 UndoStack에 추가되는지 테스트합니다.
+   /// Do pushes command onto the undo stack.
    /// </summary>
    // ------------------------------------------------------------
    [Test]
-   public void DoSession_01_Do_스택_추가()
+   public void DoSession_01_Do_PushesToUndoStack()
    {
       var session = new DoSession();
       var cmd = new TestCommand();
@@ -60,11 +61,11 @@ public class DoSessionTEST
 
    // ------------------------------------------------------------
    /// <summary>
-   /// Undo 실행 후 Command가 되돌려지는지 테스트합니다.
+   /// Undo reverts the command and moves it to redo stack.
    /// </summary>
    // ------------------------------------------------------------
    [Test]
-   public void DoSession_02_Undo_되돌리기()
+   public void DoSession_02_Undo_RevertsCommand()
    {
       var session = new DoSession();
       var cmd = new TestCommand();
@@ -78,13 +79,13 @@ public class DoSessionTEST
       Assert.AreEqual(1, session.RedoCount);
    }
 
-   // ------------------------------------------------------------
+   // -----------------------------------------------------------------
    /// <summary>
-   /// Redo 실행 후 Command가 재실행되는지 테스트합니다.
+   /// Redo re-executes the command and moves it back to undo stack.
    /// </summary>
-   // ------------------------------------------------------------
+   // -----------------------------------------------------------------
    [Test]
-   public void DoSession_03_Redo_다시실행()
+   public void DoSession_03_Redo_ReExecutesCommand()
    {
       var session = new DoSession();
       var cmd = new TestCommand();
@@ -101,11 +102,11 @@ public class DoSessionTEST
 
    // ------------------------------------------------------------
    /// <summary>
-   /// Undo 후 새 Do 시 Redo 스택이 삭제되는지 테스트합니다.
+   /// New Do after Undo clears the redo stack.
    /// </summary>
    // ------------------------------------------------------------
    [Test]
-   public void DoSession_04_Do_후_Redo스택_삭제()
+   public void DoSession_04_Do_ClearsRedoStack()
    {
       var session = new DoSession();
 
@@ -119,11 +120,11 @@ public class DoSessionTEST
 
    // ------------------------------------------------------------
    /// <summary>
-   /// 빈 스택에서 Undo/Redo 시 false를 반환하는지 테스트합니다.
+   /// Undo/Redo on empty stacks returns false.
    /// </summary>
    // ------------------------------------------------------------
    [Test]
-   public void DoSession_05_빈_스택_Undo_Redo()
+   public void DoSession_05_EmptyStack_ReturnsFalse()
    {
       var session = new DoSession();
 
@@ -133,21 +134,21 @@ public class DoSessionTEST
 
 #endregion
 
-#region 복합 명령
+#region Composite Commands
 
    // ------------------------------------------------------------
    /// <summary>
-   /// BeginGroup/EndGroup으로 묶인 Command들이 하나의 Undo 단위로 동작하는지 테스트합니다.
+   /// Grouped commands are undone as a single unit.
    /// </summary>
    // ------------------------------------------------------------
    [Test]
-   public void DoSession_06_그룹_단일_Undo()
+   public void DoSession_06_Group_SingleUndo()
    {
       var session = new DoSession();
       var cmd1 = new TestCommand();
       var cmd2 = new TestCommand();
 
-      session.BeginGroup("그룹");
+      session.BeginGroup("Group");
       session.Do(cmd1);
       session.Do(cmd2);
       session.EndGroup();
@@ -165,17 +166,17 @@ public class DoSessionTEST
 
    // ------------------------------------------------------------
    /// <summary>
-   /// 그룹 Undo 후 Redo가 정상 동작하는지 테스트합니다.
+   /// Group Redo re-executes all grouped commands.
    /// </summary>
    // ------------------------------------------------------------
    [Test]
-   public void DoSession_07_그룹_Redo()
+   public void DoSession_07_Group_Redo()
    {
       var session = new DoSession();
       var cmd1 = new TestCommand();
       var cmd2 = new TestCommand();
 
-      session.BeginGroup("그룹");
+      session.BeginGroup("Group");
       session.Do(cmd1);
       session.Do(cmd2);
       session.EndGroup();
@@ -189,11 +190,11 @@ public class DoSessionTEST
 
    // ------------------------------------------------------------
    /// <summary>
-   /// 중첩 BeginGroup 시 예외가 발생하는지 테스트합니다.
+   /// Nested BeginGroup throws InvalidOperationException.
    /// </summary>
    // ------------------------------------------------------------
    [Test]
-   public void DoSession_08_그룹_중첩_예외()
+   public void DoSession_08_Group_NestedThrows()
    {
       var session = new DoSession();
 
@@ -204,11 +205,11 @@ public class DoSessionTEST
 
    // ------------------------------------------------------------
    /// <summary>
-   /// BeginGroup 없이 EndGroup 호출 시 예외가 발생하는지 테스트합니다.
+   /// EndGroup without BeginGroup throws InvalidOperationException.
    /// </summary>
    // ------------------------------------------------------------
    [Test]
-   public void DoSession_09_EndGroup_없는_Begin_예외()
+   public void DoSession_09_EndGroup_WithoutBeginThrows()
    {
       var session = new DoSession();
 
@@ -221,11 +222,11 @@ public class DoSessionTEST
 
    // ------------------------------------------------------------
    /// <summary>
-   /// MaxSize 초과 시 가장 오래된 Command가 제거되는지 테스트합니다.
+   /// Oldest command is removed when MaxSize is exceeded.
    /// </summary>
    // ------------------------------------------------------------
    [Test]
-   public void DoSession_10_MaxSize_초과_제거()
+   public void DoSession_10_MaxSize_RemovesOldest()
    {
       var session = new DoSession { MaxSize = 3 };
 
@@ -239,20 +240,20 @@ public class DoSessionTEST
 
 #endregion
 
-#region 람다 헬퍼
+#region Lambda Helper
 
    // ------------------------------------------------------------
    /// <summary>
-   /// 람다 헬퍼 Do/Undo/Redo가 정상 동작하는지 테스트합니다.
+   /// Lambda helper Do/Undo/Redo works correctly.
    /// </summary>
    // ------------------------------------------------------------
    [Test]
-   public void DoSession_11_람다_헬퍼()
+   public void DoSession_11_Lambda_DoUndoRedo()
    {
       var session = new DoSession();
       int value = 0;
 
-      session.Do(() => value++, () => value--, "증가");
+      session.Do(() => value++, () => value--, "Increment");
 
       Assert.AreEqual(1, value);
 
@@ -265,17 +266,17 @@ public class DoSessionTEST
 
    // ------------------------------------------------------------
    /// <summary>
-   /// 람다 헬퍼의 canUndo 콜백이 장벽으로 동작하는지 테스트합니다.
+   /// Lambda canUndo callback acts as a barrier.
    /// </summary>
    // ------------------------------------------------------------
    [Test]
-   public void DoSession_12_람다_CanUndo_장벽()
+   public void DoSession_12_Lambda_CanUndoBarrier()
    {
       var session = new DoSession();
       int value = 0;
       bool canUndo = true;
 
-      session.Do(() => value++, () => value--, "증가", () => canUndo);
+      session.Do(() => value++, () => value--, "Increment", () => canUndo);
       Assert.IsTrue(session.CanUndo);
 
       canUndo = false;
@@ -287,19 +288,19 @@ public class DoSessionTEST
 
 #region DoPropertyCommand
 
-   // ------------------------------------------------------------
+   // -----------------------------------------------------------------
    /// <summary>
-   /// DoPropertyCommand가 이전 값을 캡처하고 Undo 시 복원하는지 테스트합니다.
+   /// DoPropertyCommand captures old value and restores on Undo.
    /// </summary>
-   // ------------------------------------------------------------
+   // -----------------------------------------------------------------
    [Test]
-   public void DoSession_13_PropertyCommand_값_캡처_복원()
+   public void DoSession_13_PropertyCommand_CaptureAndRestore()
    {
       var target = new TestTarget { Health = 100 };
       var session = new DoSession();
 
       session.Do(new DoPropertyCommand<TestTarget, int>(
-         target, t => t.Health, (t, v) => t.Health = v, 50, "체력 변경"));
+         target, t => t.Health, (t, v) => t.Health = v, 50, "Change health"));
 
       Assert.AreEqual(50, target.Health);
 
@@ -316,16 +317,16 @@ public class DoSessionTEST
 
    // ------------------------------------------------------------
    /// <summary>
-   /// DoCollectionCommand의 Add/Undo가 정상 동작하는지 테스트합니다.
+   /// DoCollectionCommand Add and Undo works correctly.
    /// </summary>
    // ------------------------------------------------------------
    [Test]
-   public void DoSession_14_CollectionCommand_Add_Undo()
+   public void DoSession_14_CollectionCommand_AddUndo()
    {
       var list = new List<string>();
       var session = new DoSession();
 
-      session.Do(DoCollectionCommand<string>.Add(list, "A", "추가"));
+      session.Do(DoCollectionCommand<string>.Add(list, "A", "Add"));
       Assert.AreEqual(1, list.Count);
       Assert.AreEqual("A", list[0]);
 
@@ -335,16 +336,16 @@ public class DoSessionTEST
 
    // ------------------------------------------------------------
    /// <summary>
-   /// DoCollectionCommand의 Remove/Undo가 정상 동작하는지 테스트합니다.
+   /// DoCollectionCommand Remove and Undo works correctly.
    /// </summary>
    // ------------------------------------------------------------
    [Test]
-   public void DoSession_15_CollectionCommand_Remove_Undo()
+   public void DoSession_15_CollectionCommand_RemoveUndo()
    {
       var list = new List<string> { "A", "B" };
       var session = new DoSession();
 
-      session.Do(DoCollectionCommand<string>.Remove(list, "A", "제거"));
+      session.Do(DoCollectionCommand<string>.Remove(list, "A", "Remove"));
       Assert.AreEqual(1, list.Count);
       Assert.AreEqual("B", list[0]);
 
@@ -355,7 +356,7 @@ public class DoSessionTEST
 
    // ------------------------------------------------------------
    /// <summary>
-   /// DoCollectionCommand가 HashSet에서도 동작하는지 테스트합니다.
+   /// DoCollectionCommand works with HashSet.
    /// </summary>
    // ------------------------------------------------------------
    [Test]
@@ -364,7 +365,7 @@ public class DoSessionTEST
       var set = new HashSet<int>();
       var session = new DoSession();
 
-      session.Do(DoCollectionCommand<int>.Add(set, 42, "추가"));
+      session.Do(DoCollectionCommand<int>.Add(set, 42, "Add"));
       Assert.IsTrue(set.Contains(42));
 
       session.Undo();
@@ -377,16 +378,16 @@ public class DoSessionTEST
 
    // ------------------------------------------------------------
    /// <summary>
-   /// DoDictionaryCommand의 Add/Undo가 정상 동작하는지 테스트합니다.
+   /// DoDictionaryCommand Add and Undo works correctly.
    /// </summary>
    // ------------------------------------------------------------
    [Test]
-   public void DoSession_17_DictionaryCommand_Add_Undo()
+   public void DoSession_17_DictionaryCommand_AddUndo()
    {
       var dict = new Dictionary<string, int>();
       var session = new DoSession();
 
-      session.Do(DoDictionaryCommand<string, int>.Add(dict, "HP", 100, "추가"));
+      session.Do(DoDictionaryCommand<string, int>.Add(dict, "HP", 100, "Add"));
       Assert.AreEqual(100, dict["HP"]);
 
       session.Undo();
@@ -395,16 +396,16 @@ public class DoSessionTEST
 
    // ------------------------------------------------------------
    /// <summary>
-   /// DoDictionaryCommand의 Remove/Undo가 원래 값으로 복원되는지 테스트합니다.
+   /// DoDictionaryCommand Remove and Undo restores original value.
    /// </summary>
    // ------------------------------------------------------------
    [Test]
-   public void DoSession_18_DictionaryCommand_Remove_Undo()
+   public void DoSession_18_DictionaryCommand_RemoveUndo()
    {
       var dict = new Dictionary<string, int> { { "HP", 100 } };
       var session = new DoSession();
 
-      session.Do(DoDictionaryCommand<string, int>.Remove(dict, "HP", "제거"));
+      session.Do(DoDictionaryCommand<string, int>.Remove(dict, "HP", "Remove"));
       Assert.IsFalse(dict.ContainsKey("HP"));
 
       session.Undo();
@@ -413,7 +414,7 @@ public class DoSessionTEST
 
    // ------------------------------------------------------------
    /// <summary>
-   /// DoDictionaryCommand가 SortedDictionary에서도 동작하는지 테스트합니다.
+   /// DoDictionaryCommand works with SortedDictionary.
    /// </summary>
    // ------------------------------------------------------------
    [Test]
@@ -422,7 +423,7 @@ public class DoSessionTEST
       var dict = new SortedDictionary<string, int>();
       var session = new DoSession();
 
-      session.Do(DoDictionaryCommand<string, int>.Add(dict, "MP", 50, "추가"));
+      session.Do(DoDictionaryCommand<string, int>.Add(dict, "MP", 50, "Add"));
       Assert.AreEqual(50, dict["MP"]);
 
       session.Undo();
@@ -431,15 +432,15 @@ public class DoSessionTEST
 
 #endregion
 
-#region 이벤트
+#region Events
 
    // ------------------------------------------------------------
    /// <summary>
-   /// Do/Undo/Redo 시 이벤트가 정상 발생하는지 테스트합니다.
+   /// Do/Undo/Redo raise correct events.
    /// </summary>
    // ------------------------------------------------------------
    [Test]
-   public void DoSession_20_이벤트_발행()
+   public void DoSession_20_Events_RaisedCorrectly()
    {
       var session = new DoSession();
 
@@ -468,17 +469,17 @@ public class DoSessionTEST
 
    // ------------------------------------------------------------
    /// <summary>
-   /// 그룹 EndGroup 시점에만 이벤트가 발생하는지 테스트합니다.
+   /// Group events fire only at EndGroup.
    /// </summary>
    // ------------------------------------------------------------
    [Test]
-   public void DoSession_21_그룹_이벤트_EndGroup_시점()
+   public void DoSession_21_Group_EventAtEndGroup()
    {
       var session = new DoSession();
       int doCount = 0;
       session.OnDo += _ => doCount++;
 
-      session.BeginGroup("그룹");
+      session.BeginGroup("Group");
       session.Do(new TestCommand());
       session.Do(new TestCommand());
 
@@ -495,11 +496,11 @@ public class DoSessionTEST
 
    // ------------------------------------------------------------
    /// <summary>
-   /// PeekUndo가 스택 변경 없이 top을 반환하는지 테스트합니다.
+   /// PeekUndo returns top without modifying stack.
    /// </summary>
    // ------------------------------------------------------------
    [Test]
-   public void DoSession_22_PeekUndo_변경없이_반환()
+   public void DoSession_22_PeekUndo_NoModification()
    {
       var session = new DoSession();
       var cmd = new TestCommand();
@@ -512,11 +513,11 @@ public class DoSessionTEST
 
    // ------------------------------------------------------------
    /// <summary>
-   /// PeekRedo가 스택 변경 없이 top을 반환하는지 테스트합니다.
+   /// PeekRedo returns top without modifying stack.
    /// </summary>
    // ------------------------------------------------------------
    [Test]
-   public void DoSession_23_PeekRedo_변경없이_반환()
+   public void DoSession_23_PeekRedo_NoModification()
    {
       var session = new DoSession();
       var cmd = new TestCommand();
@@ -530,11 +531,11 @@ public class DoSessionTEST
 
    // ------------------------------------------------------------
    /// <summary>
-   /// 빈 스택에서 Peek 시 null을 반환하는지 테스트합니다.
+   /// Peek on empty stack returns null.
    /// </summary>
    // ------------------------------------------------------------
    [Test]
-   public void DoSession_24_Peek_빈_스택_null()
+   public void DoSession_24_Peek_EmptyReturnsNull()
    {
       var session = new DoSession();
 
@@ -544,15 +545,15 @@ public class DoSessionTEST
 
 #endregion
 
-#region 히스토리
+#region History
 
    // ------------------------------------------------------------
    /// <summary>
-   /// UndoHistory가 전체 히스토리를 순서대로 반환하는지 테스트합니다.
+   /// UndoHistory returns commands in order.
    /// </summary>
    // ------------------------------------------------------------
    [Test]
-   public void DoSession_25_UndoHistory_순서_반환()
+   public void DoSession_25_UndoHistory_InOrder()
    {
       var session = new DoSession();
       var cmd1 = new TestCommand();
@@ -570,11 +571,11 @@ public class DoSessionTEST
 
    // ------------------------------------------------------------
    /// <summary>
-   /// RedoHistory가 정상 반환되는지 테스트합니다.
+   /// RedoHistory returns commands correctly.
    /// </summary>
    // ------------------------------------------------------------
    [Test]
-   public void DoSession_26_RedoHistory_반환()
+   public void DoSession_26_RedoHistory_Correct()
    {
       var session = new DoSession();
 
@@ -588,15 +589,15 @@ public class DoSessionTEST
 
 #endregion
 
-#region 부분 Clear
+#region Clear
 
    // ------------------------------------------------------------
    /// <summary>
-   /// ClearUndo가 Undo 스택만 비우는지 테스트합니다.
+   /// ClearUndo only clears the undo stack.
    /// </summary>
    // ------------------------------------------------------------
    [Test]
-   public void DoSession_27_ClearUndo_Undo만_삭제()
+   public void DoSession_27_ClearUndo_OnlyUndoStack()
    {
       var session = new DoSession();
 
@@ -612,11 +613,11 @@ public class DoSessionTEST
 
    // ------------------------------------------------------------
    /// <summary>
-   /// ClearRedo가 Redo 스택만 비우는지 테스트합니다.
+   /// ClearRedo only clears the redo stack.
    /// </summary>
    // ------------------------------------------------------------
    [Test]
-   public void DoSession_28_ClearRedo_Redo만_삭제()
+   public void DoSession_28_ClearRedo_OnlyRedoStack()
    {
       var session = new DoSession();
 
@@ -632,11 +633,11 @@ public class DoSessionTEST
 
    // ------------------------------------------------------------
    /// <summary>
-   /// Clear가 양쪽 스택을 모두 비우는지 테스트합니다.
+   /// Clear removes both stacks.
    /// </summary>
    // ------------------------------------------------------------
    [Test]
-   public void DoSession_29_Clear_양쪽_삭제()
+   public void DoSession_29_Clear_BothStacks()
    {
       var session = new DoSession();
 
@@ -651,15 +652,15 @@ public class DoSessionTEST
 
 #endregion
 
-#region 장벽 (CanUndo == false)
+#region Barrier (CanUndo == false)
 
    // ------------------------------------------------------------
    /// <summary>
-   /// CanUndo가 false인 Command가 장벽 역할을 하는지 테스트합니다.
+   /// CanUndo false acts as a barrier.
    /// </summary>
    // ------------------------------------------------------------
    [Test]
-   public void DoSession_30_CanUndo_장벽()
+   public void DoSession_30_CanUndo_Barrier()
    {
       var session = new DoSession();
       var barrier = new TestCommand { CanUndo = false };
@@ -674,17 +675,17 @@ public class DoSessionTEST
 
    // ------------------------------------------------------------
    /// <summary>
-   /// GroupCommand의 CanUndo가 모든 자식을 체크하는지 테스트합니다.
+   /// GroupCommand CanUndo checks all children.
    /// </summary>
    // ------------------------------------------------------------
    [Test]
-   public void DoSession_31_그룹_CanUndo_자식_체크()
+   public void DoSession_31_Group_CanUndoChecksChildren()
    {
       var session = new DoSession();
       var cmd1 = new TestCommand();
       var cmd2 = new TestCommand();
 
-      session.BeginGroup("그룹");
+      session.BeginGroup("Group");
       session.Do(cmd1);
       session.Do(cmd2);
       session.EndGroup();
@@ -699,15 +700,15 @@ public class DoSessionTEST
 
 #endregion
 
-#region Null 검증
+#region Null Validation
 
    // ------------------------------------------------------------
    /// <summary>
-   /// null Command 전달 시 예외가 발생하는지 테스트합니다.
+   /// Null command throws ArgumentNullException.
    /// </summary>
    // ------------------------------------------------------------
    [Test]
-   public void DoSession_32_Null_Command_예외()
+   public void DoSession_32_NullCommand_Throws()
    {
       var session = new DoSession();
 

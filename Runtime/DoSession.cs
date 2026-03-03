@@ -5,137 +5,147 @@ using System.Collections.Generic;
 namespace inonego.DoSession
 {
 
-   // ============================================================
+   // ==================================================================================
    /// <summary>
-   /// <br/> 범용 Undo/Redo 세션.
-   /// <br/> Command 패턴 기반으로 작업 히스토리를 관리한다.
-   /// <br/> 시스템마다 독립 인스턴스를 생성하거나 공유할 수 있다.
+   /// <br/> Generic Undo/Redo session.
+   /// <br/> Manages operation history based on the Command pattern.
+   /// <br/> Create independent instances per system or share across related systems.
    /// </summary>
-   // ============================================================
+   // ==================================================================================
    public class DoSession : IDoSession
    {
 
-   #region 필드
+   #region Fields
 
-      private readonly List<IDoCommand> undoStack = new List<IDoCommand>();
-      private readonly List<IDoCommand> redoStack = new List<IDoCommand>();
+      private readonly List<IDoCommand> undoStack = new();
+
+      private readonly List<IDoCommand> redoStack = new();
 
       private bool isGrouping = false;
+
       private List<IDoCommand> groupBuffer = null;
+
       private string groupDesc = null;
 
-      // ------------------------------------------------------------
-      /// <summary>
-      /// 히스토리 최대 크기. 초과 시 가장 오래된 항목부터 제거.
-      /// </summary>
-      // ------------------------------------------------------------
-      public int MaxSize { get; set; } = 100;
+      private int maxSize = 100;
 
-      // ------------------------------------------------------------
+      // ----------------------------------------------------------------------
       /// <summary>
-      /// Undo 가능 여부. 스택이 비어있거나 top의 CanUndo가 false면 불가.
+      /// Maximum history size. Oldest entries are removed when exceeded.
       /// </summary>
-      // ------------------------------------------------------------
+      // ----------------------------------------------------------------------
+      public int MaxSize
+      {
+         get => maxSize;
+         set => maxSize = value;
+      }
+
+      // --------------------------------------------------------------------------
+      /// <summary>
+      /// <br/> Whether undo is possible.
+      /// <br/> False if stack is empty or top command's CanUndo is false.
+      /// </summary>
+      // --------------------------------------------------------------------------
       public bool CanUndo => undoStack.Count > 0 && undoStack[undoStack.Count - 1].CanUndo;
 
       // ------------------------------------------------------------
       /// <summary>
-      /// Redo 가능 여부.
+      /// Whether redo is possible.
       /// </summary>
       // ------------------------------------------------------------
       public bool CanRedo => redoStack.Count > 0;
 
       // ------------------------------------------------------------
       /// <summary>
-      /// Undo 스택의 항목 수.
+      /// Number of entries in the undo stack.
       /// </summary>
       // ------------------------------------------------------------
       public int UndoCount => undoStack.Count;
 
       // ------------------------------------------------------------
       /// <summary>
-      /// Redo 스택의 항목 수.
+      /// Number of entries in the redo stack.
       /// </summary>
       // ------------------------------------------------------------
       public int RedoCount => redoStack.Count;
 
       // ------------------------------------------------------------
       /// <summary>
-      /// 다음 Undo 대상 Command. 없으면 null.
+      /// Next undo target command. Null if empty.
       /// </summary>
       // ------------------------------------------------------------
       public IDoCommand PeekUndo => undoStack.Count > 0 ? undoStack[undoStack.Count - 1] : null;
 
       // ------------------------------------------------------------
       /// <summary>
-      /// 다음 Redo 대상 Command. 없으면 null.
+      /// Next redo target command. Null if empty.
       /// </summary>
       // ------------------------------------------------------------
       public IDoCommand PeekRedo => redoStack.Count > 0 ? redoStack[redoStack.Count - 1] : null;
 
       // ------------------------------------------------------------
       /// <summary>
-      /// Undo 히스토리 목록. 인덱스가 클수록 최신.
+      /// Undo history list. Higher index means more recent.
       /// </summary>
       // ------------------------------------------------------------
       public IReadOnlyList<IDoCommand> UndoHistory => undoStack;
 
       // ------------------------------------------------------------
       /// <summary>
-      /// Redo 히스토리 목록. 인덱스가 클수록 최신.
+      /// Redo history list. Higher index means more recent.
       /// </summary>
       // ------------------------------------------------------------
       public IReadOnlyList<IDoCommand> RedoHistory => redoStack;
 
    #endregion
 
-   #region 이벤트
+   #region Events
 
       // ------------------------------------------------------------
       /// <summary>
-      /// Do 실행 후 발생.
+      /// Raised after Do is executed.
       /// </summary>
       // ------------------------------------------------------------
       public event Action<IDoCommand> OnDo = null;
 
       // ------------------------------------------------------------
       /// <summary>
-      /// Undo 실행 후 발생.
+      /// Raised after Undo is executed.
       /// </summary>
       // ------------------------------------------------------------
       public event Action<IDoCommand> OnUndo = null;
 
       // ------------------------------------------------------------
       /// <summary>
-      /// Redo 실행 후 발생.
+      /// Raised after Redo is executed.
       /// </summary>
       // ------------------------------------------------------------
       public event Action<IDoCommand> OnRedo = null;
 
       // ------------------------------------------------------------
       /// <summary>
-      /// 히스토리 변경 시 발생.
+      /// Raised when the history changes.
       /// </summary>
       // ------------------------------------------------------------
       public event Action OnChange = null;
 
    #endregion
 
-   #region 핵심 API
+   #region Core API
 
       // ------------------------------------------------------------
       /// <summary>
-      /// Command를 실행하고 Undo 스택에 추가한다.
+      /// Executes the command and pushes it onto the undo stack.
       /// </summary>
       // ------------------------------------------------------------
       public void Do(IDoCommand command)
       {
          if (command == null)
          {
-            throw new ArgumentNullException("command가 null입니다.");
+            throw new ArgumentNullException("command is null.");
          }
 
-         // 그룹 모드에서는 버퍼에 누적하고 개별 실행만 수행
+         // In group mode, accumulate in buffer and only execute individually
          if (isGrouping)
          {
             command.Do();
@@ -148,7 +158,7 @@ namespace inonego.DoSession
          undoStack.Add(command);
          redoStack.Clear();
 
-         // MaxSize 초과 시 가장 오래된 항목 제거
+         // Remove oldest entries when exceeding MaxSize
          while (undoStack.Count > MaxSize)
          {
             undoStack.RemoveAt(0);
@@ -158,30 +168,30 @@ namespace inonego.DoSession
          OnChange?.Invoke();
       }
 
-      // ------------------------------------------------------------
+      // --------------------------------------------------------------------------
       /// <summary>
-      /// <br/> 람다 헬퍼. 간단한 작업을 Command 클래스 없이 실행한다.
-      /// <br/> canUndo가 null이면 항상 되돌리기 가능.
+      /// <br/> Lambda helper. Executes a simple operation without a Command class.
+      /// <br/> If canUndo is null, the command is always undoable.
       /// </summary>
-      // ------------------------------------------------------------
+      // --------------------------------------------------------------------------
       public void Do(Action doAction, Action undoAction, string desc, Func<bool> canUndo = null)
       {
          Do(new DoLambdaCommand(doAction, undoAction, desc, canUndo));
       }
 
-      // ------------------------------------------------------------
+      // --------------------------------------------------------------------------
       /// <summary>
-      /// <br/> 마지막 작업을 되돌린다.
-      /// <br/> top Command의 CanUndo가 false면 장벽으로 작동하여 false를 반환한다.
+      /// <br/> Undoes the last operation.
+      /// <br/> If the top command's CanUndo is false, acts as a barrier and returns false.
       /// </summary>
-      // ------------------------------------------------------------
+      // --------------------------------------------------------------------------
       public bool Undo()
       {
          if (undoStack.Count == 0) return false;
 
          var cmd = undoStack[undoStack.Count - 1];
 
-         // 장벽: CanUndo가 false면 스택을 건드리지 않고 실패
+         // Barrier: if CanUndo is false, leave the stack untouched and fail
          if (!cmd.CanUndo) return false;
 
          undoStack.RemoveAt(undoStack.Count - 1);
@@ -196,7 +206,7 @@ namespace inonego.DoSession
 
       // ------------------------------------------------------------
       /// <summary>
-      /// 마지막으로 되돌린 작업을 다시 실행한다.
+      /// Redoes the last undone operation.
       /// </summary>
       // ------------------------------------------------------------
       public bool Redo()
@@ -217,18 +227,18 @@ namespace inonego.DoSession
 
    #endregion
 
-   #region 복합 명령
+   #region Composite Commands
 
-      // ------------------------------------------------------------
+      // ------------------------------------------------------------------------
       /// <summary>
-      /// 그룹 시작. 이후 Do() 호출은 그룹에 누적된다.
+      /// Begins a group. Subsequent Do() calls accumulate in the group.
       /// </summary>
-      // ------------------------------------------------------------
+      // ------------------------------------------------------------------------
       public void BeginGroup(string desc)
       {
          if (isGrouping)
          {
-            throw new InvalidOperationException("이미 그룹이 진행 중입니다.");
+            throw new InvalidOperationException("A group is already in progress.");
          }
 
          isGrouping = true;
@@ -236,16 +246,17 @@ namespace inonego.DoSession
          groupDesc = desc;
       }
 
-      // ------------------------------------------------------------
+      // ---------------------------------------------------------------------------------------
       /// <summary>
-      /// 그룹 종료. 누적된 Command들을 GroupCommand로 묶어 스택에 추가.
+      /// <br/> Ends the group.
+      /// <br/> Accumulated commands are bundled into a GroupCommand and pushed onto the stack.
       /// </summary>
-      // ------------------------------------------------------------
+      // ---------------------------------------------------------------------------------------
       public void EndGroup()
       {
          if (!isGrouping)
          {
-            throw new InvalidOperationException("진행 중인 그룹이 없습니다.");
+            throw new InvalidOperationException("No group is in progress.");
          }
 
          isGrouping = false;
@@ -257,7 +268,7 @@ namespace inonego.DoSession
             undoStack.Add(group);
             redoStack.Clear();
 
-            // MaxSize 초과 시 가장 오래된 항목 제거
+            // Remove oldest entries when exceeding MaxSize
             while (undoStack.Count > MaxSize)
             {
                undoStack.RemoveAt(0);
@@ -273,11 +284,11 @@ namespace inonego.DoSession
 
    #endregion
 
-   #region 관리
+   #region Management
 
       // ------------------------------------------------------------
       /// <summary>
-      /// Undo 스택과 Redo 스택을 모두 비운다.
+      /// Clears both the undo and redo stacks.
       /// </summary>
       // ------------------------------------------------------------
       public void Clear()
@@ -290,7 +301,7 @@ namespace inonego.DoSession
 
       // ------------------------------------------------------------
       /// <summary>
-      /// Undo 스택만 비운다.
+      /// Clears only the undo stack.
       /// </summary>
       // ------------------------------------------------------------
       public void ClearUndo()
@@ -302,7 +313,7 @@ namespace inonego.DoSession
 
       // ------------------------------------------------------------
       /// <summary>
-      /// Redo 스택만 비운다.
+      /// Clears only the redo stack.
       /// </summary>
       // ------------------------------------------------------------
       public void ClearRedo()

@@ -1,49 +1,58 @@
+<div align="center">
+
 # DoSession
 
-범용 Undo/Redo 시스템. Command 패턴 기반으로 어떤 종류의 작업이든 되돌리기/다시하기를 지원한다.
+![Unity](https://img.shields.io/badge/Unity-000000?logo=unity&logoColor=white)
+![C#](https://img.shields.io/badge/C%23-239120?logo=csharp&logoColor=white)
+![License](https://img.shields.io/badge/license-MIT-blue)
 
-[English](README_EN.md)
+[English](README.md) | [한국어](README_KO.md)
+
+</div>
 
 ---
 
-## 특징
+A generic Undo/Redo system based on the Command pattern. Supports undo and redo for any kind of operation.
 
-- **세션 기반** — 시스템마다 독립 인스턴스를 생성하거나 공유
-- **Command 패턴** — `IDoCommand` 인터페이스로 자유로운 확장
-- **람다 헬퍼** — 클래스 없이 간단한 작업을 즉시 등록
-- **복합 명령** — `BeginGroup`/`EndGroup`으로 여러 작업을 하나의 Undo 단위로 묶기
-- **비가역 장벽** — `CanUndo`가 false인 Command가 자동으로 Undo 차단
-- **Pure C#** — 에디터와 런타임 모두 사용 가능
+## Features
 
-## 구성
+- **Session-based** — Create independent instances per system or share across related systems
+- **Command pattern** — Extend freely via `IDoCommand` interface
+- **Lambda helper** — Register simple operations without creating a class
+- **Composite commands** — Group multiple operations into a single undo unit with `BeginGroup`/`EndGroup`
+- **Irreversible barrier** — Commands with `CanUndo = false` automatically block further undo
+
+## Structure
 
 ```
-DoSession/
-  IDoCommand.cs              — Command 인터페이스
-  IDoSession.cs              — Session 인터페이스 (DI/테스트용)
-  DoSession.cs               — 메인 세션 클래스
+Runtime/
+  IDoCommand.cs              — Command interface
+  IDoSession.cs              — Session interface (for DI/testing)
+  DoSession.cs               — Main session class
   Command/
-    DoLambdaCommand.cs       — 람다 기반 Command (내부용)
-    DoGroupCommand.cs        — 복합 Command (내부용)
-    DoPropertyCommand.cs     — 프로퍼티 변경 전용
-    DoCollectionCommand.cs   — ICollection<T> Add/Remove 전용
-    DoDictionaryCommand.cs   — IDictionary<TKey, TValue> Add/Remove 전용
+    DoPropertyCommand.cs     — Property change command
+    DoCollectionCommand.cs   — ICollection<T> Add/Remove command
+    DoDictionaryCommand.cs   — IDictionary<TKey, TValue> Add/Remove command
+    internal/
+      DoLambdaCommand.cs     — Lambda-based command (internal)
+      DoGroupCommand.cs      — Composite command (internal)
 ```
 
-## 사용법
+## Usage
 
-### 기본 — 커스텀 Command
+### Basic — Custom Command
 
-`IDoCommand`를 구현하여 작업을 정의한다.
+Implement `IDoCommand` to define an operation.
 
 ```csharp
 public class MoveCommand : IDoCommand
 {
-    private readonly Transform target;
-    private readonly Vector3 oldPos;
-    private readonly Vector3 newPos;
+    private Transform target;
+    private Vector3 oldPos;
+    private Vector3 newPos;
+    private string desc;
 
-    public string Desc => "오브젝트 이동";
+    public string Desc => desc;
     public bool CanUndo => target != null;
 
     public MoveCommand(Transform target, Vector3 newPos)
@@ -51,6 +60,7 @@ public class MoveCommand : IDoCommand
         this.target = target;
         this.oldPos = target.position;
         this.newPos = newPos;
+        this.desc = "Move object";
     }
 
     public void Do() => target.position = newPos;
@@ -59,13 +69,13 @@ public class MoveCommand : IDoCommand
 
 var session = new DoSession();
 session.Do(new MoveCommand(transform, new Vector3(1, 2, 3)));
-session.Undo();  // 원래 위치로
-session.Redo();  // 다시 (1, 2, 3)으로
+session.Undo();  // Back to original position
+session.Redo();  // Back to (1, 2, 3)
 ```
 
-### 람다 헬퍼
+### Lambda Helper
 
-간단한 작업은 클래스 없이 람다로 등록한다.
+Register simple operations without creating a command class.
 
 ```csharp
 var old = transform.position;
@@ -74,13 +84,13 @@ var next = new Vector3(1, 2, 3);
 session.Do(
     () => transform.position = next,
     () => transform.position = old,
-    "위치 변경"
+    "Change position"
 );
 ```
 
-### 프로퍼티 변경
+### Property Change
 
-getter/setter 람다를 넘기면 이전 값을 자동 캡처한다.
+Pass getter/setter lambdas to automatically capture the previous value.
 
 ```csharp
 session.Do(new DoPropertyCommand<Transform, Vector3>(
@@ -88,88 +98,87 @@ session.Do(new DoPropertyCommand<Transform, Vector3>(
     t => t.position,
     (t, v) => t.position = v,
     new Vector3(1, 2, 3),
-    "위치 변경"
+    "Change position"
 ));
 ```
 
-### 컬렉션 Add/Remove
+### Collection Add/Remove
 
-`ICollection<T>`를 구현하는 모든 컬렉션(List, HashSet, LinkedList, SortedSet 등)에 사용 가능.
+Works with any collection implementing `ICollection<T>` (List, HashSet, LinkedList, SortedSet, etc.).
 
 ```csharp
 var list = new List<string>();
 
-session.Do(DoCollectionCommand<string>.Add(list, "항목", "항목 추가"));
-session.Do(DoCollectionCommand<string>.Remove(list, "항목", "항목 제거"));
+session.Do(DoCollectionCommand<string>.Add(list, "item", "Add item"));
+session.Do(DoCollectionCommand<string>.Remove(list, "item", "Remove item"));
 ```
 
-### 딕셔너리 Add/Remove
+### Dictionary Add/Remove
 
-`IDictionary<TKey, TValue>`를 구현하는 모든 딕셔너리(Dictionary, SortedDictionary 등)에 사용 가능.
+Works with any dictionary implementing `IDictionary<TKey, TValue>` (Dictionary, SortedDictionary, etc.).
 
 ```csharp
 var dict = new Dictionary<string, int>();
 
-session.Do(DoDictionaryCommand<string, int>.Add(dict, "체력", 100, "체력 추가"));
-session.Do(DoDictionaryCommand<string, int>.Remove(dict, "체력", "체력 제거"));
+session.Do(DoDictionaryCommand<string, int>.Add(dict, "health", 100, "Add health"));
+session.Do(DoDictionaryCommand<string, int>.Remove(dict, "health", "Remove health"));
 ```
 
-### 복합 명령 (Group)
+### Composite Commands (Group)
 
-여러 작업을 하나의 Undo 단위로 묶는다.
+Group multiple operations into a single undo unit.
 
 ```csharp
-session.BeginGroup("전체 초기화");
+session.BeginGroup("Full reset");
 
-session.Do(() => hp = 100, () => hp = oldHp, "체력 초기화");
-session.Do(() => mp = 50, () => mp = oldMp, "마나 초기화");
+session.Do(() => hp = 100, () => hp = oldHp, "Reset health");
+session.Do(() => mp = 50, () => mp = oldMp, "Reset mana");
 
 session.EndGroup();
 
-session.Undo();  // 체력, 마나 모두 원래 값으로
+session.Undo();  // Both health and mana revert
 ```
 
-### 독립 세션
+### Independent Sessions
 
-시스템마다 별도 세션을 생성하여 히스토리를 분리한다.
+Create separate sessions per system to isolate history.
 
 ```csharp
 var editorSession = new DoSession { MaxSize = 200 };
 var inventorySession = new DoSession { MaxSize = 50 };
 ```
 
-### 히스토리 조회
+### History Queries
 
 ```csharp
-session.PeekUndo;      // 다음 Undo 대상 (null이면 없음)
-session.PeekRedo;      // 다음 Redo 대상
-session.UndoHistory;   // 전체 Undo 목록 (IReadOnlyList)
-session.RedoHistory;   // 전체 Redo 목록
-session.UndoCount;     // Undo 스택 크기
-session.RedoCount;     // Redo 스택 크기
+session.PeekUndo;      // Next undo target (null if empty)
+session.PeekRedo;      // Next redo target
+session.UndoHistory;   // Full undo list (IReadOnlyList)
+session.RedoHistory;   // Full redo list
+session.UndoCount;     // Undo stack size
+session.RedoCount;     // Redo stack size
 ```
 
-### 이벤트
+### Events
 
 ```csharp
-session.OnDo += cmd => Debug.Log($"실행: {cmd.Desc}");
-session.OnUndo += cmd => Debug.Log($"되돌림: {cmd.Desc}");
-session.OnRedo += cmd => Debug.Log($"다시실행: {cmd.Desc}");
-session.OnChange += () => Debug.Log("히스토리 변경됨");
+session.OnDo += cmd => Debug.Log($"Executed: {cmd.Desc}");
+session.OnUndo += cmd => Debug.Log($"Undone: {cmd.Desc}");
+session.OnRedo += cmd => Debug.Log($"Redone: {cmd.Desc}");
+session.OnChange += () => Debug.Log("History changed");
 ```
 
-## 설계 요약
+## Design Summary
 
-| 항목 | 내용 |
-|------|------|
-| 패턴 | Command |
-| Redo 정책 | 새 작업 시 Redo 스택 전체 삭제 |
-| 비가역 처리 | `IDoCommand.CanUndo`가 false면 장벽 (스택 유지, Undo 불가) |
-| 직렬화 | 런타임 전용 (없음) |
-| 스레드 | 메인 스레드 전용 |
-| 히스토리 제한 | `MaxSize` (기본 100) |
+| Item | Detail |
+|------|--------|
+| Pattern | Command |
+| Redo policy | Clear entire redo stack on new Do |
+| Irreversible handling | `IDoCommand.CanUndo` returns false = barrier (stack preserved, undo blocked) |
+| Threading | Main thread only |
+| History limit | `MaxSize` (default 100) |
 
-## 네임스페이스
+## Namespace
 
 ```csharp
 using inonego.DoSession;
